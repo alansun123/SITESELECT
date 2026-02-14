@@ -93,21 +93,43 @@ def load_rows(path):
 
 
 def load_weights(path):
+    warnings = []
+
     if not path:
-        return DEFAULT_WEIGHTS
+        return DEFAULT_WEIGHTS.copy(), warnings
+
     with open(path, "r", encoding="utf-8") as f:
         w = json.load(f)
 
     merged = {**DEFAULT_WEIGHTS, **w}
     out = {}
     for k, default_v in DEFAULT_WEIGHTS.items():
-        v = merged.get(k, default_v)
+        raw = merged.get(k, default_v)
         try:
-            out[k] = float(v)
+            v = float(raw)
         except Exception:
-            out[k] = float(default_v)
+            v = float(default_v)
+            warnings.append(f"权重 {k}={raw!r} 非数字，已回退为默认值 {default_v}")
 
-    return out
+        if v < 0:
+            warnings.append(f"权重 {k}={v} 小于 0，已钳制为 0")
+            v = 0.0
+        elif v > 1:
+            warnings.append(f"权重 {k}={v} 大于 1，已钳制为 1")
+            v = 1.0
+
+        out[k] = v
+
+    total = sum(out.values())
+    if total <= 0:
+        warnings.append("权重总和 <= 0，已回退为默认权重")
+        return DEFAULT_WEIGHTS.copy(), warnings
+
+    if abs(total - 1.0) > 1e-6:
+        warnings.append(f"权重总和为 {total:.4f}，已自动归一化为 1.0000")
+        out = {k: v / total for k, v in out.items()}
+
+    return out, warnings
 
 
 def score_rows(rows, weights):
@@ -181,7 +203,7 @@ def cmd_analyze(args):
         raise SystemExit("输入数据为空")
 
     validated_rows, issues = _validate_and_sanitize_rows(rows)
-    weights = load_weights(args.weights)
+    weights, weight_warnings = load_weights(args.weights)
     ranked = score_rows(validated_rows, weights)
     render_report(ranked, args.top, args.out)
 
@@ -191,6 +213,11 @@ def cmd_analyze(args):
         print("\n数据校验提示：")
         for issue in issues:
             print(f"- {issue}")
+
+    if weight_warnings:
+        print("\n权重处理提示：")
+        for warning in weight_warnings:
+            print(f"- {warning}")
 
 
 def build_parser():
