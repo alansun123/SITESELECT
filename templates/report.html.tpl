@@ -32,6 +32,7 @@
         <th>客流指数</th>
         <th>竞争数</th>
         <th>距目标距离(m)</th>
+        <th>数据校验提示</th>
       </tr>
     </thead>
     <tbody>
