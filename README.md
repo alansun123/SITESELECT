@@ -1,32 +1,37 @@
-# SITESELECT (MVP-first)
+# SITESELECT (GUI-first MVP)
 
-5天可落地的餐饮选址工具：**先交付结果、先验证付费**。
+餐饮选址工具，**GUI 是主入口**，CLI 是能力层与自动化入口。
 
-> 方向：本地优先（Local-first）、CLI 优先、报告优先。  
-> 现阶段不追求“全栈平台”，先把“可收费的选址分析服务”跑通。
-
-## 核心原则
-
-- **先赚钱，再工程化**：优先支持“99元/次人工咨询交付”
-- **先本地跑通**：不依赖复杂服务编排
-- **先稳定输出**：一键生成 HTML 报告
-- **API 可选增强**：高德作为增强数据源，不是硬依赖
+> 目标：在 5 天内交付一个可用、可演示、可收费的 GUI 应用（并保留 CLI 能力）。
 
 ---
 
-## MVP 范围（5天）
+## 产品定位
+
+- **主体验**：图形界面（Best Practice 交互流程）
+- **辅入口**：CLI（批处理/调试/自动化）
+- **交付物**：交互式评分流程 + 可读报告页面 + 可导出 HTML 报告
+
+---
+
+## MVP 范围（GUI-first）
 
 ### ✅ 包含
-- CLI 命令行分析
-- 本地 CSV/JSON 数据输入
-- 基础评分模型（可配置权重）
-- HTML 报告生成
+- GUI 四步流程：
+  1. 项目信息
+  2. 候选点导入
+  3. 权重调整
+  4. 结果与报告
+- 候选点表格预览与校验提示
+- 基础评分模型（可解释）
+- 报告预览 + HTML 导出
+- CLI 分析命令（保留）
 
 ### ❌ 暂不包含
-- Web 前端
-- 用户系统/支付系统
-- PostgreSQL / Redis / Serverless
-- PDF/Excel 自动导出（可后续加）
+- 多账号系统
+- 在线支付
+- 复杂 GIS 引擎
+- 大规模多租户平台
 
 ---
 
@@ -35,90 +40,64 @@
 ```text
 .
 ├── PRD.md
+├── app/
+│   └── gui_app.py              # GUI 主应用（Streamlit）
 ├── src/
 │   └── siteselect/
 │       ├── __init__.py
-│       └── cli.py
+│       └── cli.py              # CLI 能力层
 ├── templates/
 │   └── report.html.tpl
 ├── examples/
 │   ├── candidates.example.csv
 │   └── weights.example.json
 └── output/
-    └── (生成的报告)
 ```
 
 ---
 
 ## 快速开始
 
-### 1) 准备数据
-
-复制示例数据：
+## 1) 安装依赖
 
 ```bash
-cp examples/candidates.example.csv ./candidates.csv
-cp examples/weights.example.json ./weights.json
+python3 -m pip install streamlit
 ```
 
-### 2) 运行分析
+## 2) 启动 GUI
+
+```bash
+streamlit run app/gui_app.py
+```
+
+打开浏览器后按向导完成：导入 CSV → 调权重 → 查看排名 → 导出报告。
+
+## 3) 使用 CLI（可选）
 
 ```bash
 python3 src/siteselect/cli.py analyze \
-  --input ./candidates.csv \
-  --weights ./weights.json \
+  --input examples/candidates.example.csv \
+  --weights examples/weights.example.json \
   --top 5 \
-  --out ./output/report.html
-```
-
-### 3) 打开报告
-
-```bash
-open ./output/report.html
+  --out output/report.html
 ```
 
 ---
 
-## 数据字段（MVP）
+## Best Practice 交互原则（本项目已落地）
 
-输入 CSV 最少包含以下列：
-
-- `name`：候选点名称
-- `rent_monthly`：月租（元）
-- `foot_traffic_index`：客流指数（0-100）
-- `competition_count`：周边同类店数量
-- `distance_to_target_m`：距目标客群中心点距离（米）
+- 明确流程导航（步骤化）
+- 每一步有状态反馈与错误提示
+- 关键参数可调且有默认值
+- 结果页先给结论，再给细节
+- 导出操作“一键可得”
 
 ---
 
-## 评分逻辑（当前版本）
+## 下一步（Phase 2）
 
-- 租金越低越好
-- 客流越高越好
-- 竞争越少越好
-- 距离越近越好
-
-最终输出 `score`（0-100）与排序。
-
----
-
-## 商业化建议（与MVP配套）
-
-- 开源工具免费发布
-- 付费交付：人工复核 + 选址建议（99元/次）
-- 客户拿到的是“报告 + 推荐理由”，不是让客户自己学工具
-
----
-
-## 未来迭代（Phase 2）
-
-- 高德 API 接入（POI、路径、通达性）
+- 高德 API 接入（POI/通达性）
+- 地图可视化页
 - FastAPI 服务化
-- Web 界面
-- PostGIS 空间分析
+- 报告模板升级（行业版）
 
----
-
-## License
-
-暂未指定（默认保留所有权利）。
