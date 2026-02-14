@@ -1,144 +1,124 @@
-# SITESELECT
+# SITESELECT (MVP-first)
 
-餐饮细分行业智能选址工具（Local-first + 高德地图开放平台）。
+5天可落地的餐饮选址工具：**先交付结果、先验证付费**。
 
-本项目面向连锁餐饮企业选址团队，支持茶饮、冰激凌、甜点、烘焙、肉饼、高端面馆等业态的候选点位评估、竞品分析、可达性分析与选址报告输出。
+> 方向：本地优先（Local-first）、CLI 优先、报告优先。  
+> 现阶段不追求“全栈平台”，先把“可收费的选址分析服务”跑通。
 
----
+## 核心原则
 
-## 1. 项目目标
-
-- 用数据替代经验驱动选址决策
-- 缩短选址评估周期
-- 降低误选址风险
-- 建立可复盘、可解释的标准化流程
-
-详见：
-- `docs/PRD_餐饮选址工具_高德API_本地部署_V1.md`
-- `docs/附件A_研发任务拆解与排期_附件B_数据库表结构草案.md`
+- **先赚钱，再工程化**：优先支持“99元/次人工咨询交付”
+- **先本地跑通**：不依赖复杂服务编排
+- **先稳定输出**：一键生成 HTML 报告
+- **API 可选增强**：高德作为增强数据源，不是硬依赖
 
 ---
 
-## 2. 当前仓库内容
+## MVP 范围（5天）
+
+### ✅ 包含
+- CLI 命令行分析
+- 本地 CSV/JSON 数据输入
+- 基础评分模型（可配置权重）
+- HTML 报告生成
+
+### ❌ 暂不包含
+- Web 前端
+- 用户系统/支付系统
+- PostgreSQL / Redis / Serverless
+- PDF/Excel 自动导出（可后续加）
+
+---
+
+## 仓库结构
 
 ```text
 .
-├── docs/
-│   ├── PRD_餐饮选址工具_高德API_本地部署_V1.md
-│   └── 附件A_研发任务拆解与排期_附件B_数据库表结构草案.md
-├── sql/
-│   ├── init/
-│   │   ├── 000_create_extensions.sql
-│   │   └── 001_schema.sql
-│   └── 附件B_数据库表结构_PostgreSQL_PostGIS_SQL_V1.sql
-└── docker-compose.sitepilot.yml
+├── PRD.md
+├── src/
+│   └── siteselect/
+│       ├── __init__.py
+│       └── cli.py
+├── templates/
+│   └── report.html.tpl
+├── examples/
+│   ├── candidates.example.csv
+│   └── weights.example.json
+└── output/
+    └── (生成的报告)
 ```
 
 ---
 
-## 3. 技术方案（MVP）
+## 快速开始
 
-- **部署方式**：本地笔记本（Local-first）
-- **数据库**：PostgreSQL 16 + PostGIS 3.4
-- **地图数据**：高德地图开放平台 API（POI、地理编码、路径规划）
-- **接口服务（建议）**：FastAPI
-- **前端（建议）**：React / Next.js
+### 1) 准备数据
 
-> 当前仓库已提供数据库与初始化脚本，可直接启动。
-
----
-
-## 4. 快速启动（数据库）
-
-### 4.1 环境要求
-
-- Docker
-- Docker Compose（或 `docker compose`）
-
-### 4.2 启动
+复制示例数据：
 
 ```bash
-docker compose -f docker-compose.sitepilot.yml up -d
+cp examples/candidates.example.csv ./candidates.csv
+cp examples/weights.example.json ./weights.json
 ```
 
-### 4.3 连接信息
-
-- PostgreSQL
-  - Host: `localhost`
-  - Port: `5432`
-  - DB: `sitepilot`
-  - User: `sitepilot`
-  - Password: `sitepilot123`
-
-- Adminer（可视化）
-  - URL: `http://localhost:8080`
-
-### 4.4 停止
+### 2) 运行分析
 
 ```bash
-docker compose -f docker-compose.sitepilot.yml down
+python3 src/siteselect/cli.py analyze \
+  --input ./candidates.csv \
+  --weights ./weights.json \
+  --top 5 \
+  --out ./output/report.html
 ```
 
-如需清空数据卷：
+### 3) 打开报告
 
 ```bash
-docker compose -f docker-compose.sitepilot.yml down -v
+open ./output/report.html
 ```
 
 ---
 
-## 5. 数据库说明
+## 数据字段（MVP）
 
-初始化顺序（容器首次启动时自动执行）：
+输入 CSV 最少包含以下列：
 
-1. `sql/init/000_create_extensions.sql`
-2. `sql/init/001_schema.sql`
-
-主要数据实体：
-
-- 项目：`projects`
-- 候选点位：`site_candidates`
-- 竞品：`competitors`
-- 评分模板：`score_templates`
-- 评分结果：`site_scores`
-- 报告：`reports`
-- 流程日志：`workflow_logs`
-- 审计日志：`audit_logs`
-- 高德缓存：`amap_poi_cache`, `amap_route_cache`
+- `name`：候选点名称
+- `rent_monthly`：月租（元）
+- `foot_traffic_index`：客流指数（0-100）
+- `competition_count`：周边同类店数量
+- `distance_to_target_m`：距目标客群中心点距离（米）
 
 ---
 
-## 6. 业态支持（V1）
+## 评分逻辑（当前版本）
 
-- 茶饮（`tea`）
-- 冰激凌（`icecream`）
-- 甜点（`dessert`）
-- 烘焙（`bakery`）
-- 肉饼（`meatpie`）
-- 高端面馆（`noodle_premium`）
+- 租金越低越好
+- 客流越高越好
+- 竞争越少越好
+- 距离越近越好
 
----
-
-## 7. 开发建议（下一步）
-
-1. 增加 `backend/`（FastAPI）与 `frontend/`（Next.js）目录
-2. 增加 `.env.example`（高德 Key、数据库连接）
-3. 增加 `Makefile`：`up/down/logs/reset`
-4. 增加最小接口：
-   - 候选点位 CRUD
-   - 单点评分 / 批量评分
-   - 报告生成
+最终输出 `score`（0-100）与排序。
 
 ---
 
-## 8. 注意事项
+## 商业化建议（与MVP配套）
 
-- 生产环境请更换默认数据库密码
-- 高德 API Key 不要提交到仓库
-- 缓存表建议设置 TTL 清理任务
+- 开源工具免费发布
+- 付费交付：人工复核 + 选址建议（99元/次）
+- 客户拿到的是“报告 + 推荐理由”，不是让客户自己学工具
 
 ---
 
-## 9. License
+## 未来迭代（Phase 2）
+
+- 高德 API 接入（POI、路径、通达性）
+- FastAPI 服务化
+- Web 界面
+- PostGIS 空间分析
+
+---
+
+## License
 
 暂未指定（默认保留所有权利）。
