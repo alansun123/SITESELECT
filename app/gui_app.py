@@ -25,6 +25,26 @@ NUMERIC_FIELDS = [
     "distance_to_target_m",
 ]
 
+COMMON_COMPETITOR_BRANDS = [
+    "蜜雪冰城",
+    "霸王茶姬",
+    "喜茶",
+    "奈雪的茶",
+    "茶百道",
+    "瑞幸咖啡",
+    "星巴克",
+]
+INDUSTRY_OPTIONS = [
+    "现制茶饮",
+    "咖啡",
+    "快餐简餐",
+    "中式正餐",
+    "西式餐饮",
+    "烘焙甜品",
+    "小吃夜宵",
+    "其他",
+]
+
 
 st.set_page_config(page_title="SITESELECT", layout="wide")
 
@@ -33,7 +53,16 @@ st.caption("餐饮选址分析（GUI 主入口，CLI 为辅助）")
 
 
 if "project" not in st.session_state:
-    st.session_state.project = {"name": "", "category": "", "target": ""}
+    st.session_state.project = {
+        "name": "",
+        "category": "",
+        "target": "",
+        "competitor_brands": ["蜜雪冰城", "霸王茶姬"],
+        "country": "中国",
+        "city": "",
+        "district": "",
+        "industry_category": "现制茶饮",
+    }
 if "rows" not in st.session_state:
     st.session_state.rows = []
 if "weights" not in st.session_state:
@@ -44,6 +73,8 @@ if "import_errors" not in st.session_state:
     st.session_state.import_errors = []
 if "import_source" not in st.session_state:
     st.session_state.import_source = ""
+if "analysis_input" not in st.session_state:
+    st.session_state.analysis_input = {}
 
 
 def _safe_float(value):
@@ -71,15 +102,59 @@ def _validate_rows(rows):
     return errors
 
 
+def _project_validation_errors(project):
+    required_text_fields = {
+        "项目名称": project["name"],
+        "国家": project["country"],
+        "城市": project["city"],
+        "行政区": project["district"],
+    }
+    errors = []
+
+    for label, value in required_text_fields.items():
+        if not str(value).strip():
+            errors.append(f"{label}不能为空")
+
+    if not project.get("competitor_brands"):
+        errors.append("友商品牌至少选择/填写 1 个")
+
+    if project.get("industry_category") not in INDUSTRY_OPTIONS:
+        errors.append("行业分类不在支持范围内，请重新选择")
+
+    return errors
+
+
+def _build_scoring_input(rows, project):
+    context = {
+        "project_name": project["name"].strip(),
+        "category": project["category"].strip(),
+        "target": project["target"].strip(),
+        "competitor_brands": project["competitor_brands"],
+        "country": project["country"].strip(),
+        "city": project["city"].strip(),
+        "district": project["district"].strip(),
+        "industry_category": project["industry_category"],
+    }
+
+    scoring_rows = []
+    for row in rows:
+        merged = dict(row)
+        merged.update(context)
+        scoring_rows.append(merged)
+
+    return {"project_context": context, "candidates": scoring_rows}
+
+
 def _completion_state():
-    project_ok = bool(st.session_state.project["name"].strip())
+    project_errors = _project_validation_errors(st.session_state.project)
+    project_ok = len(project_errors) == 0
     data_ok = bool(st.session_state.rows) and not st.session_state.import_errors
     weights_total = sum(st.session_state.weights.values())
     weights_ok = abs(weights_total - 1.0) < 1e-6
-    return project_ok, data_ok, weights_ok, weights_total
+    return project_ok, data_ok, weights_ok, weights_total, project_errors
 
 
-project_ok, data_ok, weights_ok, weights_total = _completion_state()
+project_ok, data_ok, weights_ok, weights_total, project_errors = _completion_state()
 
 with st.sidebar:
     st.header("流程")
@@ -98,14 +173,44 @@ with st.sidebar:
 
 if step.startswith("1"):
     st.subheader("步骤 1/4 · 项目定义")
-    st.session_state.project["name"] = st.text_input("项目名称（必填）", st.session_state.project["name"])
-    st.session_state.project["category"] = st.text_input("业态", st.session_state.project["category"])
-    st.session_state.project["target"] = st.text_input("目标客群", st.session_state.project["target"])
+    st.caption("请先完整填写真实业务字段，后续评分与结果展示会引用这些上下文")
 
-    if not st.session_state.project["name"].strip():
-        st.warning("请填写项目名称后继续。")
+    p = st.session_state.project
+    p["name"] = st.text_input("我方品牌/项目名称（必填）", p["name"], help="例如：XX 茶饮华东拓店项目")
+
+    c1, c2 = st.columns(2)
+    with c1:
+        p["country"] = st.text_input("国家（必填）", p["country"], help="默认中国，可按出海场景修改")
+        p["city"] = st.text_input("城市（必填）", p["city"], placeholder="例如：上海")
+    with c2:
+        p["district"] = st.text_input("行政区（必填）", p["district"], placeholder="例如：浦东新区")
+        p["industry_category"] = st.selectbox(
+            "行业分类（必选）",
+            INDUSTRY_OPTIONS,
+            index=INDUSTRY_OPTIONS.index(p["industry_category"]) if p["industry_category"] in INDUSTRY_OPTIONS else 0,
+            help="用于界定竞品范围与评分解释口径",
+        )
+
+    p["competitor_brands"] = st.multiselect(
+        "友商品牌（至少 1 个）",
+        options=COMMON_COMPETITOR_BRANDS,
+        default=p["competitor_brands"],
+        help="可多选常见友商；若不在列表可在下方补充",
+    )
+    extra_brands = st.text_input("补充友商品牌（可选）", placeholder="多个请用逗号分隔，例如：沪上阿姨, CoCo")
+    if extra_brands.strip():
+        extra = [x.strip() for x in extra_brands.replace("，", ",").split(",") if x.strip()]
+        p["competitor_brands"] = sorted(set(p["competitor_brands"] + extra))
+
+    p["category"] = st.text_input("业态（可选）", p["category"], placeholder="例如：现制茶饮-外带")
+    p["target"] = st.text_input("目标客群（可选）", p["target"], placeholder="例如：白领 + 社区家庭")
+
+    if project_errors:
+        st.warning("请修复以下问题后继续：")
+        for err in project_errors:
+            st.write(f"- {err}")
     else:
-        st.success("项目基础信息已保存。")
+        st.success("项目业务字段已完整保存，可进入下一步。")
 
 elif step.startswith("2"):
     st.subheader("步骤 2/4 · 数据导入")
@@ -173,7 +278,7 @@ else:
     st.subheader("步骤 4/4 · 结果与导出")
 
     if not project_ok:
-        st.warning("请先完成步骤 1：至少填写项目名称。")
+        st.warning("请先完成步骤 1：补全项目业务字段。")
         st.stop()
     if not data_ok:
         st.warning("请先完成步骤 2：导入并通过校验的 CSV 数据。")
@@ -182,16 +287,35 @@ else:
         st.warning("请先完成步骤 3：将权重总和调整为 1.00。")
         st.stop()
 
-    ranked = score_rows(st.session_state.rows, st.session_state.weights)
+    analysis_input = _build_scoring_input(st.session_state.rows, st.session_state.project)
+    st.session_state.analysis_input = analysis_input
+
+    ranked = score_rows(analysis_input["candidates"], st.session_state.weights)
     st.session_state.ranked = ranked
 
     top_n = st.slider("Top N", 1, min(10, len(ranked)), min(5, len(ranked)))
+
+    st.markdown("### 项目上下文")
+    st.json(analysis_input["project_context"], expanded=False)
 
     st.markdown("### 推荐结论")
     st.success(f"Top1 推荐：{ranked[0]['name']}（score={ranked[0]['score']}）")
 
     st.markdown("### 排名明细")
-    st.dataframe(ranked, use_container_width=True)
+    visible_cols = [
+        "name",
+        "score",
+        "country",
+        "city",
+        "district",
+        "industry_category",
+        "competitor_brands",
+        "rent_monthly",
+        "foot_traffic_index",
+        "competition_count",
+        "distance_to_target_m",
+    ]
+    st.dataframe([{k: r.get(k) for k in visible_cols} for r in ranked], use_container_width=True)
 
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
     default_out = Path("output") / f"report_{ts}.html"
