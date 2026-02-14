@@ -15,8 +15,9 @@
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
-pip install streamlit
+pip install -r requirements.txt
 python3 src/siteselect/cli.py analyze --input examples/candidates.example.csv --weights examples/weights.example.json --out output/report.html
+python3 scripts/ci_smoke.py
 streamlit run app/gui_app.py
 ```
 
@@ -27,8 +28,9 @@ streamlit run app/gui_app.py
 ```powershell
 py -3 -m venv .venv
 .\.venv\Scripts\Activate.ps1
-pip install streamlit
+pip install -r requirements.txt
 python src\siteselect\cli.py analyze --input examples\candidates.example.csv --weights examples\weights.example.json --out output\report.html
+python scripts\ci_smoke.py
 streamlit run app\gui_app.py
 ```
 

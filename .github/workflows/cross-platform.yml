@@ -25,26 +25,15 @@ jobs:
       - name: Install deps
         run: |
           python -m pip install --upgrade pip
-          pip install streamlit
+          pip install -r requirements.txt
 
       - name: Syntax check
         run: |
-          python -m py_compile app/gui_app.py src/siteselect/cli.py
+          python -m py_compile app/gui_app.py src/siteselect/cli.py scripts/ci_smoke.py
 
-      - name: CLI smoke test (POSIX)
-        if: runner.os != 'Windows'
-        run: |
-          python src/siteselect/cli.py analyze \
-            --input examples/candidates.example.csv \
-            --weights examples/weights.example.json \
-            --top 3 \
-            --out output/report_ci.html
-
-      - name: CLI smoke test (Windows)
-        if: runner.os == 'Windows'
-        run: |
-          python src\siteselect\cli.py analyze --input examples\candidates.example.csv --weights examples\weights.example.json --top 3 --out output\report_ci.html
+      - name: CLI smoke test
+        run: python scripts/ci_smoke.py
 
       - name: Verify report exists
-        shell: bash
-        run: test -f output/report_ci.html
+        run: |
+          python -c "from pathlib import Path; p=Path('output/report_ci.html'); assert p.exists() and p.stat().st_size > 0, f'Missing or empty: {p}'"
