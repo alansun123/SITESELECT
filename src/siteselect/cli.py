@@ -167,7 +167,20 @@ def render_report(rows, top_n, output):
 
     top_items = []
     for r in rows[:top_n]:
-        top_items.append(f"<li><b>{r['name']}</b>（总分 {r['score']}）</li>")
+        top_items.append(f"<li><b>{r['name']}</b>（总分 {r['score']}）<div class='muted'>{r.get('explain_summary', '')}</div></li>")
+
+    first = rows[0] if rows else {}
+    project_context_pairs = [
+        ("项目", first.get("project_name", "-")),
+        ("友商品牌", first.get("project_friend_brands", "-")),
+        ("国家", first.get("project_country", "-")),
+        ("城市", first.get("project_city", "-")),
+        ("行政区", first.get("project_admin_region", "-")),
+        ("行业分类", first.get("project_industry_category", "-")),
+    ]
+    project_context_rows = "".join(
+        f"<tr><th>{k}</th><td>{v if v else '-'}</td></tr>" for k, v in project_context_pairs
+    )
 
     table_rows = []
     for i, r in enumerate(rows, start=1):
@@ -181,6 +194,9 @@ def render_report(rows, top_n, output):
             f"<td>{r['foot_traffic_index']}</td>"
             f"<td>{r['competition_count']}</td>"
             f"<td>{r['distance_to_target_m']}</td>"
+            f"<td>{r.get('project_city', '-')}</td>"
+            f"<td>{r.get('project_admin_region', '-')}</td>"
+            f"<td>{r.get('project_industry_category', '-')}</td>"
             f"<td>{quality}</td>"
             "</tr>"
         )
@@ -189,6 +205,7 @@ def render_report(rows, top_n, output):
         tpl.replace("{{generated_at}}", datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
         .replace("{{top_n}}", str(top_n))
         .replace("{{top_list_items}}", "\n".join(top_items))
+        .replace("{{project_context_rows}}", project_context_rows)
         .replace("{{table_rows}}", "\n".join(table_rows))
     )
 

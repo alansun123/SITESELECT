@@ -61,7 +61,7 @@
 ## 1) 安装依赖
 
 ```bash
-python3 -m pip install streamlit
+python3 -m pip install -r requirements.txt
 ```
 
 ## 2) 启动 GUI

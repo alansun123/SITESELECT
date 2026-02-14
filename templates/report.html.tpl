@@ -21,6 +21,13 @@
   {{top_list_items}}
   </ol>
 
+  <h2>项目上下文</h2>
+  <table>
+    <tbody>
+      {{project_context_rows}}
+    </tbody>
+  </table>
+
   <h2>完整排名</h2>
   <table>
     <thead>
@@ -32,6 +39,9 @@
         <th>客流指数</th>
         <th>竞争数</th>
         <th>距目标距离(m)</th>
+        <th>城市</th>
+        <th>行政区</th>
+        <th>行业分类</th>
         <th>数据校验提示</th>
       </tr>
     </thead>
