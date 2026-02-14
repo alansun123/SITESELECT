@@ -24,7 +24,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt pyinstaller
 
-      - name: Build exe
+      - name: Build CLI exe
         shell: pwsh
         run: |
           pyinstaller --onefile --name siteselect src/siteselect/cli.py
@@ -37,7 +37,7 @@ jobs:
         with:
           files: dist_out/SITESELECT-${{ github.ref_name }}-windows-x64.exe
 
-  build-macos-pkg:
+  build-macos-gui:
     strategy:
       fail-fast: false
       matrix:
@@ -58,28 +58,53 @@ jobs:
       - name: Install deps
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt pyinstaller
+          pip install -r requirements.txt pyinstaller pillow
 
-      - name: Build mac binary
+      - name: Build app icon (.icns)
         run: |
-          pyinstaller --onefile --name siteselect src/siteselect/cli.py
+          python scripts/build_app_icon.py
+          mkdir -p assets/SITESELECT.iconset
+          sips -z 16 16 assets/siteselect_1024.png --out assets/SITESELECT.iconset/icon_16x16.png
+          sips -z 32 32 assets/siteselect_1024.png --out assets/SITESELECT.iconset/icon_16x16@2x.png
+          sips -z 32 32 assets/siteselect_1024.png --out assets/SITESELECT.iconset/icon_32x32.png
+          sips -z 64 64 assets/siteselect_1024.png --out assets/SITESELECT.iconset/icon_32x32@2x.png
+          sips -z 128 128 assets/siteselect_1024.png --out assets/SITESELECT.iconset/icon_128x128.png
+          sips -z 256 256 assets/siteselect_1024.png --out assets/SITESELECT.iconset/icon_128x128@2x.png
+          sips -z 256 256 assets/siteselect_1024.png --out assets/SITESELECT.iconset/icon_256x256.png
+          sips -z 512 512 assets/siteselect_1024.png --out assets/SITESELECT.iconset/icon_256x256@2x.png
+          sips -z 512 512 assets/siteselect_1024.png --out assets/SITESELECT.iconset/icon_512x512.png
+          cp assets/siteselect_1024.png assets/SITESELECT.iconset/icon_512x512@2x.png
+          iconutil -c icns assets/SITESELECT.iconset -o assets/siteselect.icns
 
-      - name: Build pkg
+      - name: Build GUI .app
+        run: |
+          pyinstaller \
+            --windowed \
+            --name "SITESELECT GUI" \
+            --icon assets/siteselect.icns \
+            --add-data "app:app" \
+            --add-data "src:src" \
+            scripts/gui_launcher.py
+
+      - name: Package .app and .pkg
         run: |
           TAG="${GITHUB_REF_NAME}"
           ARCH="${{ matrix.arch }}"
-          PKGROOT="pkgroot"
-          mkdir -p "$PKGROOT/usr/local/bin"
-          cp dist/siteselect "$PKGROOT/usr/local/bin/siteselect"
-          chmod +x "$PKGROOT/usr/local/bin/siteselect"
-          pkgbuild \
-            --root "$PKGROOT" \
-            --identifier "com.alansun.siteselect.cli" \
-            --version "${TAG#v}" \
-            --install-location "/" \
-            "SITESELECT-${TAG}-macos-${ARCH}.pkg"
+          APP_NAME="SITESELECT GUI.app"
+          APP_PATH="dist/${APP_NAME}"
 
-      - name: Publish release asset (pkg)
+          ditto -c -k --sequesterRsrc --keepParent "$APP_PATH" "SITESELECT-GUI-${TAG}-macos-${ARCH}.zip"
+
+          pkgbuild \
+            --component "$APP_PATH" \
+            --install-location "/Applications" \
+            --identifier "com.alansun.siteselect.gui" \
+            --version "${TAG#v}" \
+            "SITESELECT-GUI-${TAG}-macos-${ARCH}.pkg"
+
+      - name: Publish release assets (GUI)
         uses: softprops/action-gh-release@v2
         with:
-          files: SITESELECT-${{ github.ref_name }}-macos-${{ matrix.arch }}.pkg
+          files: |
+            SITESELECT-GUI-${{ github.ref_name }}-macos-${{ matrix.arch }}.zip
+            SITESELECT-GUI-${{ github.ref_name }}-macos-${{ matrix.arch }}.pkg

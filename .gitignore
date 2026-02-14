@@ -2,3 +2,12 @@ output/
 __pycache__/
 *.pyc
 .DS_Store
+
+# packaging artifacts
+build/
+dist/
+*.spec
+*.pkg
+*.zip
+pkgroot*/
+assets/*.png
