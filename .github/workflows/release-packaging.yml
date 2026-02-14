@@ -38,7 +38,15 @@ jobs:
           files: dist_out/SITESELECT-${{ github.ref_name }}-windows-x64.exe
 
   build-macos-pkg:
-    runs-on: macos-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-13
+            arch: x64
+          - runner: macos-14
+            arch: arm64
+    runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v4
 
@@ -59,6 +67,7 @@ jobs:
       - name: Build pkg
         run: |
           TAG="${GITHUB_REF_NAME}"
+          ARCH="${{ matrix.arch }}"
           PKGROOT="pkgroot"
           mkdir -p "$PKGROOT/usr/local/bin"
           cp dist/siteselect "$PKGROOT/usr/local/bin/siteselect"
@@ -68,9 +77,9 @@ jobs:
             --identifier "com.alansun.siteselect.cli" \
             --version "${TAG#v}" \
             --install-location "/" \
-            "SITESELECT-${TAG}-macos.pkg"
+            "SITESELECT-${TAG}-macos-${ARCH}.pkg"
 
       - name: Publish release asset (pkg)
         uses: softprops/action-gh-release@v2
         with:
-          files: SITESELECT-${{ github.ref_name }}-macos.pkg
+          files: SITESELECT-${{ github.ref_name }}-macos-${{ matrix.arch }}.pkg
